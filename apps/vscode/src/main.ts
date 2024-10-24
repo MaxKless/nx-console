@@ -36,7 +36,7 @@ import { initNxConversion } from '@nx-console/vscode/nx-conversion';
 import { initHelpAndFeedbackView } from '@nx-console/vscode/nx-help-and-feedback-view';
 import { stopDaemon } from '@nx-console/vscode/nx-workspace';
 import { initVscodeProjectGraph } from '@nx-console/vscode/project-graph';
-import { enableTypeScriptPlugin } from '@nx-console/vscode/typescript-plugin';
+import { initTypeScriptServerPlugin } from '@nx-console/vscode/typescript-plugin';
 
 import {
   NxStopDaemonRequest,
@@ -96,7 +96,7 @@ export async function activate(c: ExtensionContext) {
     context.subscriptions.push(manuallySelectWorkspaceDefinitionCommand);
     await registerSettingsNxWorkspacePathWatcher();
 
-    await enableTypeScriptPlugin(context);
+    await initTypeScriptServerPlugin(context);
     watchCodeLensConfigChange(context);
 
     getTelemetry().logUsage('extension-activate', {
