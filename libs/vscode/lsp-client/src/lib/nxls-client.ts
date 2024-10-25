@@ -49,7 +49,9 @@ export function getNxlsClient() {
 export function onWorkspaceRefreshed(
   callback: () => void
 ): Disposable | undefined {
-  return getNxlsClient()?.subscribeToRefresh(callback);
+  return getNxlsClient().onNotification(NxWorkspaceRefreshNotification, () =>
+    callback()
+  );
 }
 
 export function sendNotification<P>(
