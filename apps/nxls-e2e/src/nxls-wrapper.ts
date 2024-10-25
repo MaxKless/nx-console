@@ -32,6 +32,12 @@ export class NxlsWrapper {
     console.log(`nxls stderr: ${this.process?.stderr?.read()}`);
   };
 
+  private testTimeout = setTimeout(() => {
+    if (this.process?.pid) {
+      treeKill(this.process.pid, 'SIGKILL');
+    }
+  }, 600000);
+
   constructor(private verbose?: boolean) {
     if (verbose === undefined) {
       this.verbose = !!process.env['CI'] || !!process.env['NX_VERBOSE_LOGGING'];
@@ -133,6 +139,8 @@ export class NxlsWrapper {
     this.process?.stdin?.destroy();
 
     this.process?.removeListener('exit', this.earlyExitListener);
+
+    clearTimeout(this.testTimeout);
 
     await new Promise<void>((resolve) => {
       if (this.process?.pid) {
