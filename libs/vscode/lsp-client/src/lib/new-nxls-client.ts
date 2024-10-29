@@ -1,7 +1,7 @@
 import { NxChangeWorkspace } from '@nx-console/language-server/types';
 import { getNxlsOutputChannel } from '@nx-console/vscode/output-channels';
 import { join } from 'path';
-import { ExtensionContext } from 'vscode';
+import { Disposable, ExtensionContext } from 'vscode';
 import {
   LanguageClient,
   LanguageClientOptions,
@@ -10,15 +10,7 @@ import {
   ServerOptions,
   TransportKind,
 } from 'vscode-languageclient/node';
-import {
-  assign,
-  createActor,
-  emit,
-  fromPromise,
-  sendTo,
-  setup,
-  waitFor,
-} from 'xstate';
+import { assign, createActor, fromPromise, setup, waitFor } from 'xstate';
 
 let _nxlsClient: NewNxlsClient | undefined;
 
@@ -36,7 +28,9 @@ export function getNewNxlsClient(): NewNxlsClient {
 export class NewNxlsClient {
   private client: LanguageClient | undefined;
 
-  constructor(private extensionContext: ExtensionContext) {}
+  constructor(private extensionContext: ExtensionContext) {
+    this.actor.start();
+  }
 
   private actor = createActor(
     setup({
@@ -72,7 +66,7 @@ export class NewNxlsClient {
           }
         ),
         stopClient: fromPromise(async () => {
-          return await this.stop();
+          return await this._stop();
         }),
       },
       guards: {
@@ -123,7 +117,13 @@ export class NewNxlsClient {
               target: 'stopping',
             },
             SET_WORKSPACE_PATH: {
-              actions: [() => this.sendNotification(NxChangeWorkspace)],
+              actions: [
+                ({ context }) =>
+                  this.sendNotification(
+                    NxChangeWorkspace,
+                    context.workspacePath
+                  ),
+              ],
             },
           },
         },
@@ -153,16 +153,41 @@ export class NewNxlsClient {
     this.actor.send({ type: 'START', value: workspacePath });
   }
 
+  public stop() {
+    this.actor.send({ type: 'STOP' });
+  }
+
+  public async restart() {
+    this.stop();
+    await waitFor(this.actor, (snapshot) => snapshot.matches('idle'));
+    const workspacePath = this.actor.getSnapshot().context.workspacePath;
+    if (!workspacePath) {
+      throw new Error('Workspace path is required to start the client');
+    }
+    this.start(workspacePath);
+  }
+
   public setWorkspacePath(workspacePath: string) {
     this.actor.send({ type: 'SET_WORKSPACE_PATH', value: workspacePath });
   }
 
   public onNotification(type: NotificationType<any>, callback: () => void) {
+    let innerDisposable: Disposable | undefined;
+    let isDisposed = false;
     waitFor(this.actor, (snapshot) => snapshot.matches('running')).then(() => {
+      if (isDisposed) {
+        return;
+      }
       if (!this.client) {
         throw new NxlsClientNotInitializedError();
       }
-      this.client.onNotification(type, () => callback());
+      innerDisposable = this.client.onNotification(type, () => callback());
+    });
+    return new Disposable(() => {
+      isDisposed = true;
+      if (innerDisposable) {
+        innerDisposable.dispose();
+      }
     });
   }
 
@@ -214,7 +239,7 @@ export class NewNxlsClient {
     await this.client.start();
   }
 
-  private async stop() {
+  private async _stop() {
     if (this.client) {
       await this.client.stop(2000);
     }

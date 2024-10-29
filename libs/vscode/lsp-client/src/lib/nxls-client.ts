@@ -214,10 +214,13 @@ class NxlsClient {
   ) {
     const disposable = this.refreshStartedEventEmitter.event(() => {
       const refreshPromise = new Promise<void>((resolve) => {
-        const disposable = getNxlsClient()?.subscribeToRefresh(() => {
-          disposable?.dispose();
-          resolve();
-        });
+        const disposable = getNxlsClient()?.onNotification(
+          NxWorkspaceRefreshNotification,
+          () => {
+            disposable?.dispose();
+            resolve();
+          }
+        );
       });
 
       window.withProgress(

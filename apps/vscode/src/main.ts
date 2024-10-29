@@ -122,7 +122,7 @@ export async function activate(c: ExtensionContext) {
 
 export async function deactivate() {
   await stopDaemon();
-  await getNxlsClient()?.stop();
+  getNxlsClient()?.stop();
   workspaceFileWatcher?.dispose();
   getTelemetry().logUsage('extension-deactivate');
 }
@@ -325,10 +325,13 @@ async function registerWorkspaceFileWatcher(
       nxlsClient.sendNotification(NxWorkspaceRefreshNotification);
 
       await new Promise<void>((resolve) => {
-        const disposable = nxlsClient.subscribeToRefresh(() => {
-          disposable.dispose();
-          resolve();
-        });
+        const disposable = nxlsClient.onNotification(
+          NxWorkspaceRefreshNotification,
+          () => {
+            disposable.dispose();
+            resolve();
+          }
+        );
       });
       refreshWorkspaceWithBackoff(iteration + 1);
     }
