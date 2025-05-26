@@ -1,5 +1,11 @@
 import { Option } from '@nx-console/shared/schema';
-import { QuickPickItem, window } from 'vscode';
+import {
+  QuickInputButton,
+  QuickPickItem,
+  ThemeIcon,
+  env,
+  window,
+} from 'vscode';
 
 class CliTaskFlagQuickPickItem implements QuickPickItem {
   constructor(
@@ -15,8 +21,13 @@ class ExecuteCommandQuickPickItem implements QuickPickItem {
   type = 'execute';
   picked = true;
   alwaysShow = true;
+  buttons?: readonly QuickInputButton[];
 
-  constructor(readonly label: string, readonly description?: string) {}
+  constructor(
+    readonly label: string,
+    readonly command: string,
+    readonly description?: string
+  ) {}
 }
 
 class CustomOptionsQuickPickItem implements QuickPickItem {
@@ -79,12 +90,17 @@ async function promptForFlagToSet(
   flag?: CliTaskFlagQuickPickItem;
   customOptions?: boolean;
 }> {
+  const copyButton: QuickInputButton = {
+    iconPath: new ThemeIcon('clippy'),
+    tooltip: 'Copy command to clipboard',
+  };
+
   const flagItems: Array<
     | CliTaskFlagQuickPickItem
     | ExecuteCommandQuickPickItem
     | CustomOptionsQuickPickItem
   > = [
-    new ExecuteCommandQuickPickItem(`Execute: ${currentCommand}`),
+    new ExecuteCommandQuickPickItem(`Execute: ${currentCommand}`, currentCommand),
     ...options.map((option) => {
       const detail =
         option.description ??
@@ -103,26 +119,50 @@ async function promptForFlagToSet(
     ),
   ];
 
-  const selection = await window.showQuickPick(flagItems, {
-    placeHolder: 'Execute command or set flags',
+  (flagItems[0] as ExecuteCommandQuickPickItem).buttons = [copyButton];
+
+  const quickPick = window.createQuickPick<typeof flagItems[number]>();
+  quickPick.items = flagItems;
+  quickPick.placeholder = 'Execute command or set flags';
+
+  return await new Promise((resolve) => {
+    quickPick.onDidTriggerItemButton((e) => {
+      if (
+        e.button === copyButton &&
+        (e.item as ExecuteCommandQuickPickItem).type === 'execute'
+      ) {
+        env.clipboard.writeText((e.item as ExecuteCommandQuickPickItem).command);
+      }
+    });
+
+    quickPick.onDidAccept(() => {
+      const selection = quickPick.selectedItems[0];
+      quickPick.hide();
+      if (!selection) {
+        resolve({ execute: false });
+        return;
+      }
+
+      const flagSelected = Boolean(
+        (selection as CliTaskFlagQuickPickItem).option
+      );
+      if (!flagSelected) {
+        if ((selection as CustomOptionsQuickPickItem).type === 'custom') {
+          resolve({ customOptions: true });
+        } else {
+          resolve({ execute: true });
+        }
+      } else {
+        resolve({ flag: selection as CliTaskFlagQuickPickItem });
+      }
+    });
+
+    quickPick.onDidHide(() => {
+      resolve({ execute: false });
+    });
+
+    quickPick.show();
   });
-
-  if (!selection) {
-    return { execute: false };
-  }
-
-  const flagSelected = Boolean((selection as CliTaskFlagQuickPickItem).option);
-  if (!flagSelected) {
-    if ((selection as CustomOptionsQuickPickItem).type === 'custom') {
-      return { customOptions: true };
-    } else {
-      return { execute: true };
-    }
-  } else {
-    return {
-      flag: selection as CliTaskFlagQuickPickItem,
-    };
-  }
 }
 
 function promptForFlagValue(flagToSet: CliTaskFlagQuickPickItem) {
