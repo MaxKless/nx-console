@@ -37,6 +37,13 @@ launch-templates:
           sudo apt install -y openjdk-21-jdk
           sudo update-alternatives --set java /usr/lib/jvm/java-21-openjdk-amd64/bin/java
           java -version
+      - name: Install VS Code
+        script: |
+          curl -fsSL -o /tmp/vscode.deb https://update.code.visualstudio.com/latest/linux-deb-x64/stable
+          sudo apt-get update
+          sudo apt-get install -y /tmp/vscode.deb
+          rm -f /tmp/vscode.deb
+          code --version
       - name: Restore Node Modules Cache
         uses: 'nrwl/nx-cloud-workflows/v4/workflow-steps/cache/main.yaml'
         inputs:
@@ -66,6 +73,13 @@ launch-templates:
           sudo apt install -y openjdk-21-jdk
           sudo update-alternatives --set java /usr/lib/jvm/java-21-openjdk-amd64/bin/java
           java -version
+      - name: Install VS Code
+        script: |
+          curl -fsSL -o /tmp/vscode.deb https://update.code.visualstudio.com/latest/linux-deb-x64/stable
+          sudo apt-get update
+          sudo apt-get install -y /tmp/vscode.deb
+          rm -f /tmp/vscode.deb
+          code --version
       - name: Restore Node Modules Cache
         uses: 'nrwl/nx-cloud-workflows/v4/workflow-steps/cache/main.yaml'
         inputs:
